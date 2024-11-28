@@ -3,8 +3,7 @@ library(rstan)
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
 
-dat = fread("data/absorbance_indices_reduced_data.csv")
-dat[[1]] = NULL # row numbers
+dat = fread("data/absorbance_indices_reduced_data.csv", drop = 1)
 
 # drop reservoir from the data, we will treat it separately later
 dat_res = dat[replicate == "Reservoir"]
@@ -25,7 +24,7 @@ dat[,column_id := as.integer(factor(column_id))]
 
 # figure out the index of the row for the time step before each observation
 # uses witchcraft
-dat$prev_id = sapply(paste0(dat$column_id, dat$day_id - 1), 
+dat$prev_id = sapply(paste0(dat$column_id, dat$day_id - 1),
 	match, paste0(dat$column_id, dat$day_id))
 dat[is.na(prev_id), prev_id := 0]
 
@@ -35,7 +34,7 @@ dat[prev_id != 0]$increment = dat[prev_id != 0]$day_no - dat[dat[prev_id != 0]$p
 
 # we need to figure out what cells are missing
 missing = data.table(expand.grid(day_id = unique(dat$day_id), col_id = unique(dat$column_id)))
-missing = merge(missing, dat[,.(sample_date, day_id, column_id)], by.x = c("day_id", "col_id"), 
+missing = merge(missing, dat[,.(sample_date, day_id, column_id)], by.x = c("day_id", "col_id"),
 	by.y = c("day_id", "column_id"), all.x = TRUE)
 missing = missing[is.na(sample_date), .(day_id, col_id)]
 
@@ -57,7 +56,7 @@ stan_data = with(dat, list(
 	# t_m = missing$day_id
 
 	# position = as.integer(substr(col_no, 2, 2)),
-	# chain_id = as.integer(factor(replicate)),	
+	# chain_id = as.integer(factor(replicate)),
 ))
 
 mod = stan_model("stan/columns.stan")
