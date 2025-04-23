@@ -1,10 +1,10 @@
-library(rstan)
 library(dplyr)
 
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
 
 dat <- read.csv("data/absorbance_indices_reduced_data.csv")[, -1]
+dat_DOC <- read.csv("data/DOC_final_pretreated_all.csv", sep = ";")[, -2]
 
 # drop reservoir from the data, we will treat it separately later
 dat_res <- dat |>
@@ -12,6 +12,24 @@ dat_res <- dat |>
 
 dat_columns <- dat |>
   filter(replicate != "Reservoir")
+
+# Bring the DOC data to the same shape
+dat_DOC <- dat_DOC |>
+  mutate(sample_date = substr(Sample, 1, 3),
+         replicate = substr(Sample, 5, 5),
+         col_no = substr(Sample, 7,8))
+
+# Remove everything beefore S08 since these are growth days
+# Remove the reservoirs coded as C0 (column 0)
+
+dat_DOC_columns <- dat_DOC |>
+  filter(col_no != "C0") |>
+  filter(sample_date >= "S08")
+
+# Merge the 2 data sets if DOC will be part of the analysis
+# The missing data is randomly missing (sample lost)
+dat_columns <- dat_columns |>
+  full_join(dat_DOC_columns, by = c("Sampling_Day", "sample_date", "replicate", "col_no"))
 
 # Calculate the log ratios of the variables to the average of the day00 and day0
 
