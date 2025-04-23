@@ -115,7 +115,9 @@ variables <- c(
   `log_ratio_hix` = "HIX",
   `log_ratio_a254` = "a254",
   `log_ratio_E2_E3` = "E2:E3",
-  `log_ratio_SR` = "SR"
+  `log_ratio_SR` = "SR",
+  `log_ratio_DOC` = "DOC",
+  `log_ratio_DN` = "DN"
 )
 
 variable_labeller <- function(variable, value) {
