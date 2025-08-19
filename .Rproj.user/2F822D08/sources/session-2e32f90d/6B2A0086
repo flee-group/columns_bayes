@@ -1,0 +1,26 @@
+{
+    "id": "6B2A0086",
+    "path": "~/Desktop/columns_bayes/r/01_data_cleaning.R",
+    "project_path": "r/01_data_cleaning.R",
+    "type": "r_source",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1755606726799.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "57,15",
+        "scrollLine": "39"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1755609531,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1755609531105,
+    "read_only": false,
+    "read_only_alternatives": []
+}
