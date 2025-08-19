@@ -54,6 +54,8 @@ data <- dat_columns |>
   mutate(across(c(Sampling_Day, replicate, col_no), as.factor)) |>
   select(day_no = Sampling_Day, replicate, col_no, starts_with("log_ratio"))
 
+data <- convert_column_labels(data)
+
 # Add chainID as the concatenation of replicate and col_no. It is repeated for some but not all.
 data <- data |>
   mutate(chainID = as.factor(paste0(replicate, "_",col_no))) |>

@@ -24,37 +24,30 @@ color_column <- function() {
                               guide = "legend")
 }
 
-#' Column Names and Labeller
+#' Convert Column Identifiers to Descriptive Labels
 #'
-#' These functions handle custom column names and labeling for use in `ggplot2` or other visualizations.
-#' The `col_names` vector provides a mapping between short column identifiers and their full descriptive names.
-#' The `column_labeller` function retrieves the appropriate label for each column based on its value, useful for customizing facet labels or other plot components.
+#' This function converts short column identifiers (e.g., "C1", "C2") into their full descriptive names
+#' (e.g., "Column 1", "Column 2") within a data frame. It is useful for preparing data for visualization or reporting,
+#' where readable labels are preferred over short identifiers.
 #'
-#' @return
-#' - `col_names`: A named vector that maps column identifiers to descriptive column names.
-#' - `column_labeller`: A function that returns the appropriate column label for a given value.
+#' @param data A data frame containing a column named `col_no` with short identifiers (e.g., "C1", "C2").
+#' @return A data frame with the `col_no` column converted to a factor with descriptive labels.
+#' @examples
+#' # Example data frame
+#' df <- data.frame(col_no = c("C1", "C2", "C3"), value = 1:3)
+#'
+#' # Convert column identifiers to descriptive labels
+#' df_labeled <- convert_column_labels(df)
+#' print(df_labeled)
+#'
+#'
 #' @export
 #'
-#' @examples
-#' # Accessing column names
-#' col_names
-#'
-#' # Using column_labeller with ggplot2
-#' column_labeller(variable = NULL, value = "Col1")
-#'
-#' # Example usage with ggplot2 for custom facet labeling
-#' library(ggplot2)
-#' ggplot(mtcars, aes(factor(cyl), mpg)) +
-#'   geom_boxplot() +
-#'   facet_wrap(~gear, labeller = column_labeller)
-col_names <- c(
-  `C1` = "Col 1",
-  `C2` = "Col 2",
-  `C3` = "Col 3"
-)
-
-column_labeller <- function(variable, value) {
-  return(col_names[value])
+convert_column_labels = function(data) {
+  data$col_no = factor(data$col_no,
+                         levels = c("C1", "C2", "C3"),
+                         labels = c("Column 1", "Column 2", "Column 3"))
+  return(data)
 }
 
 #' Day Names and Labeller
@@ -142,20 +135,20 @@ theme_boxplot <- function() {
   ggplot2::theme_bw() +
     ggplot2::theme(
       # General text settings
-      text = ggplot2::element_text(size = 11),
-      axis.title = ggplot2::element_text(size = 11),
+      text = ggplot2::element_text(size = 12),
+      axis.title = ggplot2::element_text(size = 12),
       # X-axis text settings
-      axis.text.x = ggplot2::element_text(color = "black", size = 10),
+      axis.text.x = ggplot2::element_text(color = "black", size = 12),
       # Y-axis text settings
-      axis.text.y = ggplot2::element_text(color = "black", size = 10),
+      axis.text.y = ggplot2::element_text(color = "black", size = 12),
 
       # Legend settings
-      legend.position = "bottom",
+      legend.position = "right",
 
       # Strip settings
       strip.placement = "outside",
       strip.background = ggplot2::element_blank(),
-      strip.text = ggplot2::element_text(size = 11, color = "black"),
+      strip.text = ggplot2::element_text(size = 13, color = "black"),
 
       # Panel and axis line settings
       axis.line = ggplot2::element_line(color = "black", linewidth = 0.5),
