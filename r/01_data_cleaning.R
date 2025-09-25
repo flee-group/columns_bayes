@@ -1,4 +1,5 @@
 library(dplyr)
+source("r/plotting_functions.R")
 
 options(mc.cores = parallel::detectCores())
 rstan::rstan_options(auto_write = TRUE)
