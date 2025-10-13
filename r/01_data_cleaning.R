@@ -60,7 +60,7 @@ data <- convert_column_labels(data)
 # Add chainID as the concatenation of replicate and col_no. It is repeated for some but not all.
 data <- data |>
   mutate(columnID = as.factor(paste0(replicate, "_",col_no))) |>
-  relocate(chainID, .before = 1)
+  relocate(replicate, .before = 1)
 
 
 
