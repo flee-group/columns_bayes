@@ -7,18 +7,19 @@ rstan::rstan_options(auto_write = TRUE)
 dat <- read.csv("data/absorbance_indices_reduced_data.csv")[, -1]
 dat_DOC <- read.csv("data/DOC_final_pretreated_all.csv", sep = ";")[, -2]
 
-# drop reservoir from the data, we will treat it separately later
+# drop reservoir from the data, and collect all reservoir data separately. we will treat it separately later
 dat_res <- dat |>
   filter(replicate == "Reservoir")
 
 dat_columns <- dat |>
-  filter(replicate != "Reservoir")
+  filter(replicate != "Reservoir") 
 
 # Bring the DOC data to the same shape
 dat_DOC <- dat_DOC |>
   mutate(sample_date = substr(Sample, 1, 3),
          replicate = substr(Sample, 5, 5),
          col_no = substr(Sample, 7,8))
+
 
 # Remove everything beefore S08 since these are growth days
 # Remove the reservoirs coded as C0 (column 0)
@@ -61,8 +62,4 @@ data <- convert_column_labels(data)
 data <- data |>
   mutate(columnID = as.factor(paste0(replicate, "_",col_no))) |>
   relocate(replicate, .before = 1)
-
-
-
-
 
