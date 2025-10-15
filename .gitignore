@@ -1,2 +1,6 @@
 data/*
 *.rds
+.Rproj.user/*
+*.pdf
+.Rproj.user
+output/*
