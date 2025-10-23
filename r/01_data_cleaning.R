@@ -2,7 +2,6 @@ library(dplyr)
 source("r/plotting_functions.R")
 
 options(mc.cores = parallel::detectCores())
-rstan::rstan_options(auto_write = TRUE)
 
 dat <- read.csv("data/absorbance_indices_reduced_data.csv")[, -1]
 dat_DOC <- read.csv("data/DOC_final_pretreated_all.csv", sep = ";")[, -2]
@@ -20,7 +19,7 @@ dat_DOC <- dat_DOC |>
          replicate = substr(Sample, 5, 5),
          col_no = substr(Sample, 7,8))
 
-# Remove everything beefore S08 since these are growth days
+# Remove everything beefore S08 since these are growth daysno
 # Remove the reservoirs coded as C0 (column 0)
 
 dat_DOC_columns <- dat_DOC |>
@@ -62,7 +61,6 @@ data <- data |>
   mutate(columnID = as.factor(paste0(replicate, "_",col_no))) |>
   relocate(replicate, .before = 1)
 
-
-
-
-
+# parse day number into an integer column
+data$day_number <- as.integer(sub("Day(.+)", "\\1", data$day_no))
+saveRDS(data, "data/cleaned_data.rds")
