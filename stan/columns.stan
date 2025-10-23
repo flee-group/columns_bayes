@@ -1,67 +1,62 @@
 data {
-	int <lower=1> no; // number of observations
-	// int <lower=1> nm; // number of missing cells in the dataset
-	int <lower=1> ncol; // number of columns
-	int <lower=1> nt; // number of time steps
+	int <lower=1> n_obs; // number of observations
+	int <lower=1> n_col; // number of columns - note this is physical columns, not data columns
+	int <lower=1> n_time; // number of time steps
+	// int <lower=1> n_chain; // number of chains of columns (NOT MCMC chains!)
 
-	vector [no] y_obs;
-	vector <lower=0, upper = 1> [no] rev;
-	int <lower=0, upper = no> i_prev [no];
-	vector <lower=0, upper = nt> [no] dt; // the time interval (i.e., day_id) of each obs
-	// int <lower=0, upper = nt> interval [no]; // the time interval (i.e., day_id) of each obs
-	// int <lower=1, upper=ncol> col_id_obs [no]; // column id of the observations
-	// int <lower=1, upper=nt> t_obs [no]; // time step of each observation
-	// int <lower=1, upper=ncol> col_id_m [nm]; // column id of missing cells
-	// int <lower=1, upper=nt> t_m [nm]; // time step of missing cells
-
-	// int <lower=1> nchn; // number of chains
-	// int <lower = 1, upper = nchn> chain_id [n];
+	vector [n_obs] y_obs; // observations
+	// array [n_obs] int <lower=0, upper = n_chain> chain_id; //grouping variable for chains/replicates
+	array [n_obs] int <lower=0, upper= n_col> column_id; // grouping variable for individual (non-nested) columns
+	
+	// prior hyperparameters
+	real <lower=0> a_scale;
+	real <lower=0> sig_scale;
+	// real <lower=0> chain_scale;
+	// real <lower=0> chain_sig_scale;
+	real <lower=0> col_scale;
+	real <lower=0> col_sig_scale;
 }
-// transformed data {
-// 	matrix <lower=0, upper=1> [nt,ncol] reversed = rep_matrix(1, nt, ncol);
-// 	reversed[1,] = rep_row_vector(0, ncol);
-// }
 parameters {
-	// latent variable
-	// vector <lower=0> [nm] y_mis;
+	real <lower=0> sigma; // global residual variance
+	real a; // global intercept
+	// vector[n_chain] gamm_chain_sc; // random effect for chains, scaled
+	vector[n_col] gamm_col_sc; // random effect for columns, scaled
 
-	real <lower=0> sigma;
-	real a;
-	real b_rev;
-	real r;
-	// vector [nt-1] b_time; // effect of each time step
-
-	// real a_mu;
-	// real a_sig;
+  // hyperparameters for chain random effect
+	// real mu_chain;
+	// real sig_chain;
+	real mu_col;
+	real sig_col;
 }
 transformed parameters {
-	vector [no] mu; // expected value for y_obs
-	for(i in 1:no) {
-	// 	mu[i] = a;
-	// 	if(i_prev[i] != 0)
-	// 		mu[i] += b_time[interval[i]] * y_obs[i_prev[i]];
-	// 	mu[i] = exp(mu[i]);
+	vector [n_obs] mu; // expected value for y_obs
+	// vector[n_chain] gamm_chain; // random effect for chains
+	vector[n_col] gamm_col; // random effect for columns
+	
+	// re-centre the random effects
+	// gamm_chain = mu_chain + gamm_chain_sc * sig_chain;
+	gamm_col = mu_col + gamm_col_sc * sig_col;
+	
+  for(i in 1:n_obs) {
+    mu[i] = a + gamm_col[column_id[i]];
+    // mu[i] = a + gamm_chain[chain_id[i]] + gamm_col[column_id[i]];
+  }
 
-		// different idea: exponential decay
-		if(i_prev[i] != 0) {
-			mu[i] = a + b_rev * rev[i] + y_obs[i_prev[i]] * exp(-r * dt[i]);
-		} else {
-			mu[i] = a + b_rev * rev[i];
-		}
-	}
 }
 model {
 	y_obs ~ normal(mu, sigma);
 
 	// hierachical priors
-	// a ~ normal(a_mu, a_sig);
+	// gamm_chain_sc ~ std_normal();
+	gamm_col_sc ~ std_normal();
 
 	// priors
-	a ~ cauchy(0, 10);
-	b_rev ~ cauchy(0, 5);
-	// a_mu ~ cauchy(0, 10);
-	// a_sig ~ cauchy(0, 10);
-	sigma ~ cauchy(0, 5);
-	// b_time ~ cauchy(0, 5);
-	r ~ normal(0, 5);
+	a ~ normal(0, a_scale);
+	sigma ~ cauchy(0, sig_scale);
+
+  // hyperpriors
+  // mu_chain ~ normal(0, chain_scale);
+  // sig_chain ~ cauchy(0, chain_sig_scale);
+  mu_col ~ normal(0, col_scale);
+  sig_col ~ cauchy(0, col_sig_scale);
 }
