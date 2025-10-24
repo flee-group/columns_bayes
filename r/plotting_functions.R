@@ -74,6 +74,7 @@ convert_column_labels = function(data) {
 #'   geom_boxplot() +
 #'   facet_wrap(~gear, labeller = day_labeller)
 day_names <- c(
+  `Day00`= "Before \nReversal",
   `Day1` = "1",
   `Day2` = "2",
   `Day3` = "3",

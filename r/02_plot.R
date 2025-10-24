@@ -6,18 +6,17 @@ source("r/plotting_functions.R")
 if(!dir.exists("output/plots")) {dir.create("output/plots")}
 
 head(data)
-melted_data <- data |>
+melted_data <- data_all |>
   gather(key =  "variable",
-         value = "measurement", starts_with("log_ratio")) |>
+         value = "measurement", all_of(variables)) |>
   mutate(variable = as.factor(variable))
 
 c_plot <- ggplot(data = melted_data, aes(x = day_no, y = measurement, color = col_no)) +
   facet_grid(variable ~ col_no, scales = "free_y",
              labeller = labeller(variable = variable_labeller()), switch = "y") +
-  annotate("segment", x = -Inf, xend = Inf, y = 0, yend = 0, colour = "#999", linewidth = 1)+
   geom_boxplot() +
   color_column() + theme_boxplot() +
-  xlab("Days") + ylab("log ratio of dayX to day0") +
+  xlab("Days") + ylab("Variable") +
   scale_x_discrete(labels = day_labeller) +
   theme(axis.ticks = element_line())
 
