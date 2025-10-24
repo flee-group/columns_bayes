@@ -1,67 +1,62 @@
 data {
-	int <lower=1> no; // number of observations
-	// int <lower=1> nm; // number of missing cells in the dataset
-	int <lower=1> ncol; // number of columns
-	int <lower=1> nt; // number of time steps
-
-	vector [no] y_obs;
-	vector <lower=0, upper = 1> [no] rev;
-	int <lower=0, upper = no> i_prev [no];
-	vector <lower=0, upper = nt> [no] dt; // the time interval (i.e., day_id) of each obs
-	// int <lower=0, upper = nt> interval [no]; // the time interval (i.e., day_id) of each obs
-	// int <lower=1, upper=ncol> col_id_obs [no]; // column id of the observations
-	// int <lower=1, upper=nt> t_obs [no]; // time step of each observation
-	// int <lower=1, upper=ncol> col_id_m [nm]; // column id of missing cells
-	// int <lower=1, upper=nt> t_m [nm]; // time step of missing cells
-
-	// int <lower=1> nchn; // number of chains
-	// int <lower = 1, upper = nchn> chain_id [n];
+	int <lower=1> n_obs; // number of observations
+	int <lower=1> n_chains; // number replicate chains
+	int <lower=1> n_days; // number of days
+	array [n_obs] int <lower=1, upper = n_chains> chain_id; 
+	array [n_obs] int <lower=1, upper = n_days> day_id; // actually day number + 1 (day 0 is day_id 1)
+	array [n_obs] int <lower=1, upper=3> pos; // in which position is each observation (after the change)
+	
+	vector [n_obs] y_obs; // observations
 }
-// transformed data {
-// 	matrix <lower=0, upper=1> [nt,ncol] reversed = rep_matrix(1, nt, ncol);
-// 	reversed[1,] = rep_row_vector(0, ncol);
-// }
 parameters {
-	// latent variable
-	// vector <lower=0> [nm] y_mis;
+	real <lower=0> sig_obs; // global residual variance
+  vector[3] b; // position effect
+  vector[2] g; // autocorrelation strength;
 
-	real <lower=0> sigma;
-	real a;
-	real b_rev;
-	real r;
-	// vector [nt-1] b_time; // effect of each time step
+  array [3] matrix [n_chains, n_days] y_latent_scaled;
 
-	// real a_mu;
-	// real a_sig;
+  // hyperparameters for latent effect
+	real <lower = 0> y_lat_sig;
+	real y_lat_mu;
 }
 transformed parameters {
-	vector [no] mu; // expected value for y_obs
-	for(i in 1:no) {
-	// 	mu[i] = a;
-	// 	if(i_prev[i] != 0)
-	// 		mu[i] += b_time[interval[i]] * y_obs[i_prev[i]];
-	// 	mu[i] = exp(mu[i]);
-
-		// different idea: exponential decay
-		if(i_prev[i] != 0) {
-			mu[i] = a + b_rev * rev[i] + y_obs[i_prev[i]] * exp(-r * dt[i]);
-		} else {
-			mu[i] = a + b_rev * rev[i];
-		}
-	}
+  array [3] matrix [n_chains, n_days] y_latent;
+  
+  // autoregressive portion of the model
+  for(p in 1:3) {
+    // scale the latent variable
+    y_latent[p] = y_latent_scaled[p] * y_lat_sig + y_lat_mu;
+    for(ch in 1:n_chains) {
+      // different step size for the first day
+      y_latent[p][ch,2] = b[p] + g[1] * y_latent[p][ch, 1];
+      for(t in 3:n_days) {
+        y_latent[p][ch,t] = b[p] + g[2] * y_latent[p][ch, t-1];
+      }
+    }
+  }
 }
 model {
-	y_obs ~ normal(mu, sigma);
+  for(i in 1:n_obs) {
+    int ch = chain_id[i];
+    int t = day_id[i];
+    int p = pos[i];
+    y_obs[i] ~ normal(y_latent[p][ch,t], sig_obs);
+  }
 
-	// hierachical priors
-	// a ~ normal(a_mu, a_sig);
+  for(p in 1:3) {
+    for(ch in 1:n_chains) {
+      for(t in 1:n_days) {
+        y_latent_scaled[p][ch,t] ~ std_normal();
+      }
+    }
+  }
 
 	// priors
-	a ~ cauchy(0, 10);
-	b_rev ~ cauchy(0, 5);
-	// a_mu ~ cauchy(0, 10);
-	// a_sig ~ cauchy(0, 10);
-	sigma ~ cauchy(0, 5);
-	// b_time ~ cauchy(0, 5);
-	r ~ normal(0, 5);
+	b ~ normal(0, 5);
+	g ~ normal(0, 1);
+	sig_obs ~ cauchy(0, 5);
+	
+	// hyperpriors
+  y_lat_sig ~ cauchy(0, 5);
+  y_lat_mu ~ normal(0, 5);
 }
