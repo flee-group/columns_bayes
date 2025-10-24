@@ -4,50 +4,50 @@ rstan_options(auto_write = TRUE)
 
 dat = readRDS("data/cleaned_data.rds")
 
-# reshape the data into a series of matrices
-# allows for one row per time series
-# one column per day
-# downside is one matrix per variable, but it is worth it for 
-# simplicity in stan
-library(reshape2)
-acast(dat, columnID ~ day_number, value.var = "log_ratio_DOC")
-acast(dat, col_no ~ day_number, value.var = "log_ratio_DOC", fun.aggregate = mean)
 
-
-x# drop NAs for now, imputations may follow?
+# remove rows with NAs for now, imputations to follow?
 dat <- dat[complete.cases(dat),]
 
-# for now, working with DOC
+# for now, working with bix
 # convert to a list expected by rstan
 stan_data = with(dat, list(
 	n_obs = nrow(dat),
-  n_chain = length(levels(replicate)),
-	n_col = length(levels(columnID)),
-  n_time = max(day_number),
-  y_obs = log_ratio_DOC,
+  n_chains = length(levels(replicate)),
+	n_days = 18,
 	chain_id = as.integer(replicate),
-	column_id = as.integer(columnID),
-	
-	# priors here
-	a_scale = 5,
-	sig_scale =2.5,
-	chain_scale = 1,
-	chain_sig_scale = 1,
-	col_scale = 1,
-	col_sig_scale = 1
+	day_id = day_number + 1,
+	pos = as.integer(substr(col_no, 8,8)),
+  y_obs = bix
 ))
 
 mod = stan_model("stan/columns.stan")
-fit = sampling(mod, data = stan_data, open_progress = FALSE, control = list(max_treedepth = 14))
+fit = sampling(mod, data = stan_data, open_progress = FALSE, iter = 10000,
+               control = list(adapt_delta = 0.99, max_treedepth = 14))
+saveRDS(fit, "results/car_latent_fit.rds")
 
 
 
+samps = as.matrix(fit, pars = "y_latent")
+plot_data = data.table::rbindlist(lapply(1:3, \(p) {
+  res = sapply(1:18, \(t) {
+    cols = grep(paste0("y_latent\\[", p, ",.+,",t,'\\]'), colnames(samps))
+    quantile(samps[,cols], c(0.5, 0.05, 0.95))
+  })
+  res = data.frame(t(res))
+  colnames(res) = c("median", "lower", "upper")
+  res$day = 0:17
+  res
+}), idcol = "position")
+plot_data$position = factor(plot_data$position)
 
+raw_data_plot = data.frame(day = stan_data$day_id - 1, y = stan_data$y_obs, position = factor(stan_data$pos))
 
-
-
-
-
+library(ggplot2)
+ggplot() + # geom_point(data = raw_data_plot, aes(x = day, y = y, col = position), size = 0.1) + 
+  geom_line(data = plot_data, aes(x = day, y = median, col = position)) + 
+  geom_point(data = plot_data, aes(x = day, y = median, col = position)) + 
+  geom_errorbar(data = plot_data, aes(x = day, ymin = lower, ymax = upper, col = position), width = 0.2) +
+  ylab("E(bix)")
 
 
 

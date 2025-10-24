@@ -60,3 +60,13 @@ model {
   y_lat_sig ~ cauchy(0, 5);
   y_lat_mu ~ normal(0, 5);
 }
+generated quantities {
+ // simulated hypothetical chain with complete time series
+ matrix [3, n_days] y_sim;
+ for(p in 1:3) {
+   for(t in 1_n_days) {
+     
+   }
+ }
+  
+}
