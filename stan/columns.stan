@@ -1,62 +1,62 @@
 data {
 	int <lower=1> n_obs; // number of observations
-	int <lower=1> n_col; // number of columns - note this is physical columns, not data columns
-	int <lower=1> n_time; // number of time steps
-	// int <lower=1> n_chain; // number of chains of columns (NOT MCMC chains!)
-
-	vector [n_obs] y_obs; // observations
-	// array [n_obs] int <lower=0, upper = n_chain> chain_id; //grouping variable for chains/replicates
-	array [n_obs] int <lower=0, upper= n_col> column_id; // grouping variable for individual (non-nested) columns
+	int <lower=1> n_chains; // number replicate chains
+	int <lower=1> n_days; // number of days
+	array [n_obs] int <lower=1, upper = n_chains> chain_id; 
+	array [n_obs] int <lower=1, upper = n_days> day_id; // actually day number + 1 (day 0 is day_id 1)
+	array [n_obs] int <lower=1, upper=3> pos; // in which position is each observation (after the change)
 	
-	// prior hyperparameters
-	real <lower=0> a_scale;
-	real <lower=0> sig_scale;
-	// real <lower=0> chain_scale;
-	// real <lower=0> chain_sig_scale;
-	real <lower=0> col_scale;
-	real <lower=0> col_sig_scale;
+	vector [n_obs] y_obs; // observations
 }
 parameters {
-	real <lower=0> sigma; // global residual variance
-	real a; // global intercept
-	// vector[n_chain] gamm_chain_sc; // random effect for chains, scaled
-	vector[n_col] gamm_col_sc; // random effect for columns, scaled
+	real <lower=0> sig_obs; // global residual variance
+  vector[3] b; // position effect
+  vector[2] g; // autocorrelation strength;
 
-  // hyperparameters for chain random effect
-	// real mu_chain;
-	// real sig_chain;
-	real mu_col;
-	real sig_col;
+  array [3] matrix [n_chains, n_days] y_latent_scaled;
+
+  // hyperparameters for latent effect
+	real <lower = 0> y_lat_sig;
+	real y_lat_mu;
 }
 transformed parameters {
-	vector [n_obs] mu; // expected value for y_obs
-	// vector[n_chain] gamm_chain; // random effect for chains
-	vector[n_col] gamm_col; // random effect for columns
-	
-	// re-centre the random effects
-	// gamm_chain = mu_chain + gamm_chain_sc * sig_chain;
-	gamm_col = mu_col + gamm_col_sc * sig_col;
-	
-  for(i in 1:n_obs) {
-    mu[i] = a + gamm_col[column_id[i]];
-    // mu[i] = a + gamm_chain[chain_id[i]] + gamm_col[column_id[i]];
+  array [3] matrix [n_chains, n_days] y_latent;
+  
+  // autoregressive portion of the model
+  for(p in 1:3) {
+    // scale the latent variable
+    y_latent[p] = y_latent_scaled[p] * y_lat_sig + y_lat_mu;
+    for(ch in 1:n_chains) {
+      // different step size for the first day
+      y_latent[p][ch,2] = b[p] + g[1] * y_latent[p][ch, 1];
+      for(t in 3:n_days) {
+        y_latent[p][ch,t] = b[p] + g[2] * y_latent[p][ch, t-1];
+      }
+    }
   }
-
 }
 model {
-	y_obs ~ normal(mu, sigma);
+  for(i in 1:n_obs) {
+    int ch = chain_id[i];
+    int t = day_id[i];
+    int p = pos[i];
+    y_obs[i] ~ normal(y_latent[p][ch,t], sig_obs);
+  }
 
-	// hierachical priors
-	// gamm_chain_sc ~ std_normal();
-	gamm_col_sc ~ std_normal();
+  for(p in 1:3) {
+    for(ch in 1:n_chains) {
+      for(t in 1:n_days) {
+        y_latent_scaled[p][ch,t] ~ std_normal();
+      }
+    }
+  }
 
 	// priors
-	a ~ normal(0, a_scale);
-	sigma ~ cauchy(0, sig_scale);
-
-  // hyperpriors
-  // mu_chain ~ normal(0, chain_scale);
-  // sig_chain ~ cauchy(0, chain_sig_scale);
-  mu_col ~ normal(0, col_scale);
-  sig_col ~ cauchy(0, col_sig_scale);
+	b ~ normal(0, 5);
+	g ~ normal(0, 1);
+	sig_obs ~ cauchy(0, 5);
+	
+	// hyperpriors
+  y_lat_sig ~ cauchy(0, 5);
+  y_lat_mu ~ normal(0, 5);
 }

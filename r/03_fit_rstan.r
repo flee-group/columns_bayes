@@ -4,7 +4,17 @@ rstan_options(auto_write = TRUE)
 
 dat = readRDS("data/cleaned_data.rds")
 
-# drop NAs for now, imputations may follow?
+# reshape the data into a series of matrices
+# allows for one row per time series
+# one column per day
+# downside is one matrix per variable, but it is worth it for 
+# simplicity in stan
+library(reshape2)
+acast(dat, columnID ~ day_number, value.var = "log_ratio_DOC")
+acast(dat, col_no ~ day_number, value.var = "log_ratio_DOC", fun.aggregate = mean)
+
+
+x# drop NAs for now, imputations may follow?
 dat <- dat[complete.cases(dat),]
 
 # for now, working with DOC
@@ -29,6 +39,16 @@ stan_data = with(dat, list(
 
 mod = stan_model("stan/columns.stan")
 fit = sampling(mod, data = stan_data, open_progress = FALSE, control = list(max_treedepth = 14))
+
+
+
+
+
+
+
+
+
+
 
 
 
