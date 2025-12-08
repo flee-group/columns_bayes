@@ -41,18 +41,17 @@ data_before_averages <- dat_columns |>
   group_by(replicate, col_no) |>
   summarise(across(all_of(variables), ~ mean(.x, na.rm = TRUE), .names = "mean_{.col}"))
 
+data_day00 <- dat_columns |>
+  filter(sample_date %in% c("S08"))
+
 # Calculate the log ratios of all the variables by joining the data_before_averages and mutating over
 # Remember that col_no is always after the reversal, hence equal of the "position" from our discussions.
 data <- dat_columns |>
   filter(!sample_date %in% c( "S08", "S10")) |>
-  left_join(data_before_averages, by = c("replicate", "col_no")) |>
   group_by(replicate, col_no) |>
-  mutate(across(all_of(variables),
-                ~ log(.x / get(paste0("mean_", cur_column()))),
-                .names = "log_ratio_{.col}")) |>
   ungroup() |>
   mutate(across(c(Sampling_Day, replicate, col_no), as.factor)) |>
-  select(day_no = Sampling_Day, replicate, col_no, starts_with("log_ratio"))
+  select(day_no = Sampling_Day, replicate, col_no, all_of(variables))
 
 data <- convert_column_labels(data)
 
@@ -61,6 +60,34 @@ data <- data |>
   mutate(columnID = as.factor(paste0(replicate, "_",col_no))) |>
   relocate(replicate, .before = 1)
 
+# combine with before reversal Day 00 data (coded as S08)
+# Prepare data_day00 to match the structure of data
+data_day00_formatted <- dat_columns |>
+  filter(sample_date %in% c("S08")) |>
+  select(replicate, day_no = Sampling_Day, col_no, all_of(variables) ) |>
+  mutate(
+    day_no = as.factor(day_no),
+    replicate = as.factor(replicate),
+    col_no = as.factor(col_no),
+    columnID = NA_character_,  # Leave empty
+    after_reversal_position = case_when(
+      col_no == "C1" ~ "Column 3",
+      col_no == "C3" ~ "Column 1",
+      col_no == "C2" ~ "Column 2")) |>
+  select(replicate, day_no, col_no, all_of(variables), columnID, after_reversal_position) |>
+  convert_column_labels()
+
+# Combine the datasets
+data_combined <- bind_rows(data, data_day00_formatted)
+
+# create the columnID to match the after reversal ID's
+data_all <- data_combined |>
+  mutate(columnID = case_when(
+    day_no == "Day00" ~ as.factor(paste0(replicate, "_", after_reversal_position)), 
+    TRUE ~ as.factor(columnID))) |>
+  select(!after_reversal_position)
+
+
 # parse day number into an integer column
-data$day_number <- as.integer(sub("Day(.+)", "\\1", data$day_no))
-saveRDS(data, "data/cleaned_data.rds")
+data_all$day_number <- as.integer(sub("Day(.+)", "\\1", data_all$day_no))
+saveRDS(data_all, "data/cleaned_data.rds")
