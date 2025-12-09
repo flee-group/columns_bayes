@@ -51,7 +51,8 @@ data <- dat_columns |>
   group_by(replicate, col_no) |>
   ungroup() |>
   mutate(across(c(Sampling_Day, replicate, col_no), as.factor)) |>
-  select(day_no = Sampling_Day, replicate, col_no, all_of(variables))
+  select(day_no = Sampling_Day, replicate, col_no, all_of(variables)) |>
+  filter(replicate != "O") # we remove replicate O because sadly it is not reversed
 
 data <- convert_column_labels(data)
 
