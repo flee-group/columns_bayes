@@ -107,4 +107,22 @@ ggplot() +
   theme_bw() +
   theme(panel.grid.minor = element_blank(),
         legend.position = "right")
+# Create the loadings plot
+loadings_plot <- ggplot() +
+  # Draw loading arrows
+  geom_segment(data = PCAloadings, aes(x = 0, y = 0, xend = Dim.1 * 4, yend = Dim.2 * 4),
+               arrow = arrow(length = unit(0.3, "cm"), type = "closed"), linewidth = 1) +
+  # Add variable labels
+  geom_text(data = PCAloadings, aes(x = Dim.1 * 4.3, y = Dim.2 * 4.3, label = Variables),
+            size = 4, fontface = "bold") +
+  # Add reference lines
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+  # Labels with variance explained
+  labs(x = paste0("PC1 (", round(weighted_pca$eig[1, 2], 1), "%)"),
+       y = paste0("PC2 (", round(weighted_pca$eig[2, 2], 1), "%)"),
+       title = "PCA Loadings Plot") +
+  theme_bw() +
+  theme(panel.grid.minor = element_blank(),
+        plot.title = element_text(hjust = 0.5, face = "bold"))
 
