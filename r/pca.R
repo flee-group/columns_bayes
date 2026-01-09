@@ -33,17 +33,18 @@ ggplot(data = pca_results, aes(x = PC1, y = PC2)) +
 
 # Weighted PCA with FactoMineR
 
-day_col_counts <- pca_data[, .N, by = .(day_no, col_no)]
-pca_data[, weight := 1 / .N, by = .(day_no, col_no)]
-pca_data[, weight := weight / sum(weight) * .N]
+#day_col_counts <- pca_data[, .N, by = .(day_no, col_no)]
+#pca_data[, weight := 1 / .N, by = .(day_no, col_no)]
+#pca_data[, weight := weight / sum(weight) * .N]
 
-weighted_pca <- FactoMineR::PCA(pca_data[, c("bix", "fi", "hix", "suva254", "E2_E3", "SR")], 
-                    row.w = pca_data$weight,  # vector of row weights
-                    scale.unit = TRUE,      # standardize variables
-                    graph = FALSE)
+#weighted_pca <- FactoMineR::PCA(pca_data[, c("bix", "fi", "hix", "suva254", "E2_E3", "SR")], 
+ #                   row.w = pca_data$weight,  # vector of row weights
+  #                  scale.unit = TRUE,      # standardize variables
+   #                 graph = FALSE)
 
 # Extract scores (individual coordinates) for the biplot
-pca_scores <- as.data.frame(weighted_pca$ind$coord)
+pca_scores <- as.data.frame(wine.pca$x)
+#pca_scores <- as.data.frame(weighted_pca$ind$coord)
 pca_scores$replicate <- pca_data$replicate
 pca_scores$day_no <- pca_data$day_no
 pca_scores$col_no <- pca_data$col_no
@@ -52,31 +53,35 @@ pca_scores$col_no <- pca_data$col_no
 pca_scores_dt <- as.data.table(pca_scores)
 
 # Extract loadings (variable coordinates) for arrows
-PCAloadings <- as.data.frame(weighted_pca$var$coord)
+#PCAloadings <- as.data.frame(weighted_pca$var$coord)
+PCAloadings <- as.data.frame(wine.pca$rotation)
 PCAloadings$Variables <- rownames(PCAloadings)
+explained_variance <- wine.pca$sdev^2 / sum(wine.pca$sdev^2)
+
+
 
 # Create the biplot
-ggplot(data = pca_scores, aes(x = Dim.1, y = Dim.2)) +
+ggplot(data = pca_scores, aes(x = PC1, y = PC2)) +
   geom_point(aes(fill = day_no, color = day_no, shape = col_no), size = 4) +
   geom_segment(data = PCAloadings, 
-               aes(x = 0, y = 0, xend = Dim.1, yend = Dim.2), 
+               aes(x = 0, y = 0, xend = PC1, yend = PC2), 
                arrow = arrow(length = unit(1, "picas")), 
                color = "black") +
   annotate("text", 
-           x = PCAloadings$Dim.1 * 1.1, 
-           y = PCAloadings$Dim.2 * 1.1,
+           x = PCAloadings$PC1 * 1.1, 
+           y = PCAloadings$PC2 * 1.1,
            label = PCAloadings$Variables) +
-  labs(x = paste0("PC1 (", round(weighted_pca$eig[1,2], 1), "%)"),
-       y = paste0("PC2 (", round(weighted_pca$eig[2,2], 1), "%)")) +
+  labs(x = paste0("PC1 (", round(explained_variance[1], 2), "%)"),
+       y = paste0("PC2 (", round(explained_variance[2], 2), "%)")) +
   theme_bw()
 
 
 # Create arrows: Column 1 → Column 2 → Column 3
 arrow_data <- pca_scores_dt[, .(
-  x_start = c(Dim.1[col_no == "Column 1"], Dim.1[col_no == "Column 2"]),
-  y_start = c(Dim.2[col_no == "Column 1"], Dim.2[col_no == "Column 2"]),
-  x_end = c(Dim.1[col_no == "Column 2"], Dim.1[col_no == "Column 3"]),
-  y_end = c(Dim.2[col_no == "Column 2"], Dim.2[col_no == "Column 3"]),
+  x_start = c(PC1[col_no == "Column 1"], PC1[col_no == "Column 2"]),
+  y_start = c(PC2[col_no == "Column 1"], PC2[col_no == "Column 2"]),
+  x_end = c(PC1[col_no == "Column 2"], PC1[col_no == "Column 3"]),
+  y_end = c(PC2[col_no == "Column 2"], PC2[col_no == "Column 3"]),
   segment = c("1to2", "2to3")
 ), by = .(replicate, day_no)]
 
@@ -86,7 +91,7 @@ arrow_data_subset <- arrow_data[day_no %in% c("Day0", "Day3", "Day10", "Day17")]
 ggplot() +
   # Add ellipses for each day (will show one per facet)
   stat_ellipse(data = pca_scores,
-               aes(x = Dim.1, y = Dim.2, 
+               aes(x = PC1, y = PC2, 
                    fill = day_no),
                geom = "polygon",
                color = "black",
@@ -104,7 +109,7 @@ ggplot() +
                alpha = 0.7) +
   # Add points for each column
   geom_point(data = pca_scores, 
-             aes(x = Dim.1, y = Dim.2, 
+             aes(x = PC1, y = PC2, 
                  color = replicate, 
                  shape = col_no),
              size = 2.5) +
@@ -114,27 +119,28 @@ ggplot() +
   # Facet by day
   facet_wrap(~day_no, ncol = 3) +
   # Labels with variance explained
-  labs(x = paste0("PC1 (", round(weighted_pca$eig[1, 2], 1), "%)"),
-       y = paste0("PC2 (", round(weighted_pca$eig[2, 2], 1), "%)"),
+  labs(x = paste0("PC1 (", round(explained_variance[1], 3)*100, "%)"),
+       y = paste0("PC2 (", round(explained_variance[2], 3)*100, "%)"),
        color = "Replicate",
        shape = "Column") +
   theme_bw() +
   theme(panel.grid.minor = element_blank(),
         legend.position = "right")
+
 # Create the loadings plot
 loadings_plot <- ggplot() +
   # Draw loading arrows
-  geom_segment(data = PCAloadings, aes(x = 0, y = 0, xend = Dim.1 * 4, yend = Dim.2 * 4),
+  geom_segment(data = PCAloadings, aes(x = 0, y = 0, xend = PC1 * 4, yend = PC2 * 4),
                arrow = arrow(length = unit(0.3, "cm"), type = "closed"), linewidth = 1) +
   # Add variable labels
-  geom_text(data = PCAloadings, aes(x = Dim.1 * 4.3, y = Dim.2 * 4.3, label = Variables),
+  geom_text(data = PCAloadings, aes(x = PC1 * 4.3, y = PC2 * 4.3, label = Variables),
             size = 4, fontface = "bold") +
   # Add reference lines
   geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
   geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
   # Labels with variance explained
-  labs(x = paste0("PC1 (", round(weighted_pca$eig[1, 2], 1), "%)"),
-       y = paste0("PC2 (", round(weighted_pca$eig[2, 2], 1), "%)"),
+  labs(x = paste0("PC1 (", round(explained_variance[1], 3)*100, "%)"),
+       y = paste0("PC2 (", round(explained_variance[2], 3)*100, "%)"),
        title = "PCA Loadings Plot") +
   theme_bw() +
   theme(panel.grid.minor = element_blank(),
@@ -155,8 +161,8 @@ arrow_facets <- ggplot(data = arrow_data) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
   geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
   # Labels with variance explained
-  labs(x = paste0("PC1 (", round(weighted_pca$eig[1, 2], 1), "%)"),
-       y = paste0("PC2 (", round(weighted_pca$eig[2, 2], 1), "%)"),
+  labs(x = paste0("PC1 (", round(explained_variance[1], 3)*100, "%)"),
+       y = paste0("PC2 (", round(explained_variance[2], 3)*100, "%)"),
        color = "Day") +
   theme_bw() +
   theme(panel.grid.minor = element_blank(),
@@ -184,8 +190,8 @@ average_arrows_facet <- ggplot(data = arrow_data) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
   geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
   # Labels with variance explained
-  labs(x = paste0("PC1 (", round(weighted_pca$eig[1, 2], 1), "%)"),
-       y = paste0("PC2 (", round(weighted_pca$eig[2, 2], 1), "%)"),
+  labs(x = paste0("PC1 (", round(explained_variance[1], 3)*100, "%)"),
+       y = paste0("PC2 (", round(explained_variance[2], 3)*100, "%)"),
        color = "Day") +
   theme_bw() +
   theme(panel.grid.minor = element_blank(),
