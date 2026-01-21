@@ -196,8 +196,7 @@ average_arrows_facet <- ggplot(data = arrow_data) +
   theme_bw() +
   theme(panel.grid.minor = element_blank(),
         legend.position = "right") +
-  scale_colour_manual(values = (c("#f1a226", "#e0c0b0", "#c0d8d8", "#9fc8c8","#7dc5c5",
-                                  "#65c2c2", "#54a1a1", "#428f8f","#307d7d","#1f6f6f")))
+  scale_colour_manual(values = (c("#f1a226", "#c0d8d8","#7dc5c5","#1f6f6f")))
   
 arrow_data <- arrow_data |>
   mutate(length_x = x_end - x_start, 
