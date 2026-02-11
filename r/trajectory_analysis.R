@@ -1,51 +1,88 @@
 library(ecotraj)
 
-# Aggregate PC scores - average across replicates
-pca_scores_agg <- pca_scores %>%
-  group_by(col_no, day_no) %>%
-  summarise(across(PC1:PC6, mean), .groups = 'drop')
-
-
-entities <- pca_scores_agg$col_no
-surveys <- as.numeric(factor(pca_scores_agg$day_no, labels = c(1,2,3,4)))
-times <- as.numeric(substr(pca_scores_agg$day_no, 4, 5))
+entities <- pca_data$replicate
+surveys <- as.numeric(substr(pca_data$col_no, 8, 8))
 
 # Matrice of Euclidian distanced d between "states
-d <- vegdist(pca_scores_agg[3:8], method = "euclidian")
+d <- vegdist(wine.pca$x[, 1:6], method = "euclidian")
 
 # Define trajectories
-x <- defineTrajectories(d, entities, surveys, times = times)
+x <- defineTrajectories(d, entities, surveys)
 
-replicate_cols <- unique(pca_scores_agg[,c("col_no")])
-unique_cols <- sort(unique(replicate_cols$col_no))
+replicate_days <- unique(pca_data[,c("day_no", "replicate")])
+unique_days <- sort(unique(replicate_days$day_no))
 day_colors <- c("#f1a226", "#9fc8c8", "#54a1a1", "#1f6f6f")
 x_Day0 <- subsetTrajectories(x, 
-                             site_selection =  "Column 1")
+                             site_selection = as.vector(replicate_days[replicate_days[,day_no == "Day0"]]$replicate))
 
+# ============ CREATE SEPARATE PLOTS FOR EACH DAY ============
+par(mfrow = c(2, 2))  # 2x2 grid for 4 days
+
+for(i in 1:length(unique_days)) {
+  day <- unique_days[i]
+  
+  # Get replicates for this day
+  day_replicates <- as.character(replicate_days[replicate_days$day_no == day, ]$replicate)
+  
+  # Get row indices for this day in pca_data
+  day_indices <- which(pca_data$day_no == day)
+  
+  # Get PCA coordinates for this day using YOUR ORIGINAL PCA
+  pca_day <- wine.pca$x[day_indices, 1:2]
+  
+  # Create plot with original PCA coordinates
+  plot(pca_day[, 1], pca_day[, 2], type = "n",
+       main = paste("Trajectories:", day),
+       xlab = "PC1 (28%)", ylab = "PC2 (21%)")
+  
+  # Draw trajectories manually with the color for this day
+  for(rep in day_replicates) {
+    # Get the rows for this replicate within day_indices
+    rep_rows <- which(pca_data$replicate == rep & pca_data$day_no == day)
+    
+    # Draw arrows connecting columns 1->2->3
+    for(j in 1:(length(rep_rows)-1)) {
+      arrows(wine.pca$x[rep_rows[j], 1], wine.pca$x[rep_rows[j], 2],
+             wine.pca$x[rep_rows[j+1], 1], wine.pca$x[rep_rows[j+1], 2],
+             col = day_colors[i],  # Use the color for this day
+             lwd = 2, length = 0.1)
+    }
+  }
+}
+
+par(mfrow = c(1, 1))
 ## Trajectory metrics
 ### Changes in ecological states
 #### Trajectory Lenght - Changes in the ecological state
-trajectories <- data.frame(col_no = rownames(trajectoryLengths(x, relativeToInitial = FALSE)), trajectoryLengths(x, relativeToInitial = FALSE))
-trajectories <- merge(trajectories, unique(pca_scores_agg[,c(1,2)]), by = "col_no")
+trajectories <- data.frame(replicate = rownames(trajectoryLengths(x, relativeToInitial = FALSE)), trajectoryLengths(x, relativeToInitial = FALSE))
+trajectories <- merge(trajectories, unique(pca_data[,c(1,2)]), by = "replicate")
 
 mean_trajectory <- trajectories |>
-  group_by(col_no) |>
+  group_by(day_no) |>
   summarise(mean_path = mean(Path))
 
 # Long data for the side by side boxplots
 trajectories_long <- trajectories |>
-  pivot_longer(cols = c(S1, S2, S3), 
+  pivot_longer(cols = c(S1, S2), 
                names_to = "Metric", 
                values_to = "Value")
 
+# Plot to show path lengths of each arrow
+length_plot <- ggplot(data = trajectories_long, aes(x = day_no, y = Value, fill = Metric)) +
+  geom_boxplot() +
+  labs(x = "Day", y = "Trajectory Lengths", fill = "Path") +
+  scale_fill_manual(name = "Segment",
+                    values = c("S1" = "#D0F1BF", "S2" = "#86AF83"),
+                    labels = c("S1" = "C1 to C2", "S2" = "C2 to C3")) +
+  theme_bw()
 
 ggplot(data = mean_trajectory) +
-  geom_point(aes(x = col_no, y = mean_path))+
+  geom_point(aes(x = day_no, y = mean_path))+
   theme_bw()
 
 
-ggplot(data = trajectories_long) +
-  geom_boxplot(aes(x = Metric, y = Value))+
+ggplot(data = trajectories) +
+  geom_boxplot(aes(x = day_no, y =Path))+
   theme_bw()
 
 #### Trajectory length internal variation 
@@ -223,10 +260,24 @@ surveys <- as.numeric(substr(averaged_pca_matrix$col_no, 8, 8))
 
 # Define trajectories
 trajectories_averaged <- defineTrajectories(d_averaged, entities, surveys)
-centered_x <- centerTrajectories(x_centered)
+centered_x <- centerTrajectories(x)
 
-unique_days <- sort(unique(replicate_days$day_no))
-day_colors <- c("#f1a226", "#9fc8c8", "#54a1a1", "#1f6f6f")
+# Get the data
+angles <- trajectoryAngles(trajectories_averaged)
+lengths <- trajectoryLengths(trajectories_averaged)
+
+# Combine into one table
+combined_table <- data.frame(
+  Day = rownames(lengths),
+  `Segment 1 \n Length` = signif(lengths$S1, 2),
+  `Segment 2 \n Length` = signif(lengths$S2, 2),
+  `Total \n length` = signif(lengths$Path, 2),
+  `Segment \n angle` = signif(angles$`S1-S2`, 2),
+  check.names = FALSE  # Keep spaces in column names
+)
+
+# Display the table
+print(combined_table)
 
 # Get PCoA coordinates from the centered distance matrix
 pcoa_averaged_centered <- cmdscale(centered_x$d, k = 6)
@@ -236,7 +287,7 @@ plot(pcoa_averaged_centered[, 1], pcoa_averaged_centered[, 2],
      type = "n",
      xlab = "PCoA 1 (centered)", 
      ylab = "PCoA 2 (centered)",
-     main = "Centered Trajectories: All Days Combined")
+     main = "Centered Trajectories: All Replicates Averaged per Day")
 
 # Draw trajectories colored by day
 for(ent in unique_days) {
@@ -274,5 +325,17 @@ legend("topright",
 
 
 ## grouped plot
-patchwork::average_arrows_facet+loadings_plot)/(length_plot+angle_plot+directionality_plot)
+library(patchwork)
+(average_arrows_facet+loadings_plot)/(length_plot+angle_plot+directionality_plot)
 
+library(patchwork)
+library(ggpubr)
+
+# Create the table as a ggplot object
+table_plot <- ggtexttable(combined_table, rows = NULL, 
+                          theme = ttheme("light"))
+
+# Combine with patchwork
+(average_arrows_facet + loadings_plot) / table_plot + 
+  plot_layout(heights = c(1.5, 1)) 
+                                      

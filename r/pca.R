@@ -141,7 +141,7 @@ loadings_plot <- ggplot() +
   # Labels with variance explained
   labs(x = paste0("PC1 (", round(explained_variance[1], 3)*100, "%)"),
        y = paste0("PC2 (", round(explained_variance[2], 3)*100, "%)"),
-       title = "PCA Loadings Plot") +
+       title = "PCA Loadings") +
   theme_bw() +
   theme(panel.grid.minor = element_blank(),
         plot.title = element_text(hjust = 0.5, face = "bold"))
@@ -180,7 +180,7 @@ pca_scores_dt |>
 
 average_arrows_facet <- ggplot(data = arrow_data) +
   # Draw arrows for each replicate-day
-  facet_wrap(~day_no)+
+#  facet_wrap(~day_no)+
   geom_segment(data = average_arrow_data, aes(x = x_start, y = y_start, 
                    xend = x_end, yend = y_end,
                    color = day_no),
@@ -192,11 +192,14 @@ average_arrows_facet <- ggplot(data = arrow_data) +
   # Labels with variance explained
   labs(x = paste0("PC1 (", round(explained_variance[1], 3)*100, "%)"),
        y = paste0("PC2 (", round(explained_variance[2], 3)*100, "%)"),
-       color = "Day") +
+       color = "Day",  title = "PCA Scores") +
   theme_bw() +
   theme(panel.grid.minor = element_blank(),
-        legend.position = "right") +
-  scale_colour_manual(values = (c("#f1a226", "#c0d8d8","#7dc5c5","#1f6f6f")))
+        plot.title = element_text(hjust = 0.5, face = "bold"),
+        legend.position = "bottom",
+        legend.location = "panel") +
+  scale_colour_manual(values = (c("#f1a226", "#c0d8d8","#7dc5c5","#1f6f6f"))) 
+
   
 arrow_data <- arrow_data |>
   mutate(length_x = x_end - x_start, 
