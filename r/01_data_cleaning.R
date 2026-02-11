@@ -1,7 +1,6 @@
 library(dplyr)
 source("r/plotting_functions.R")
 
-options(mc.cores = parallel::detectCores())
 
 dat <- read.csv("data/absorbance_indices_reduced_data.csv")[, -1]
 dat_DOC <- read.csv("data/DOC_final_pretreated_all.csv", sep = ";")[, -2]
@@ -24,7 +23,7 @@ dat_DOC <- dat_DOC |>
 
 dat_DOC_columns <- dat_DOC |>
   filter(col_no != "C0") |>
-  filter(sample_date >= "S08")
+  filter(sample_date >= "S10")
 
 # Merge the 2 data sets if DOC will be part of the analysis
 # The missing data is randomly missing (sample lost)
@@ -37,12 +36,12 @@ variables <- c("bix", "fi", "hix", "a254", "E2_E3", "SR", "DOC", "DN")
 
 # The averaged before the reversal
 data_before_averages <- dat_columns |>
-  filter(sample_date %in% c("S08", "S10")) |>
+  filter(sample_date %in% c("S10")) |>
   group_by(replicate, col_no) |>
   summarise(across(all_of(variables), ~ mean(.x, na.rm = TRUE), .names = "mean_{.col}"))
 
 data_day00 <- dat_columns |>
-  filter(sample_date %in% c("S08"))
+  filter(sample_date %in% c("S10"))
 
 # Calculate the log ratios of all the variables by joining the data_before_averages and mutating over
 # Remember that col_no is always after the reversal, hence equal of the "position" from our discussions.
@@ -51,7 +50,8 @@ data <- dat_columns |>
   group_by(replicate, col_no) |>
   ungroup() |>
   mutate(across(c(Sampling_Day, replicate, col_no), as.factor)) |>
-  select(day_no = Sampling_Day, replicate, col_no, all_of(variables))
+  select(day_no = Sampling_Day, replicate, col_no, all_of(variables)) |>
+  filter(replicate != "O") # we remove replicate O because sadly it is not reversed
 
 data <- convert_column_labels(data)
 
@@ -63,7 +63,7 @@ data <- data |>
 # combine with before reversal Day 00 data (coded as S08)
 # Prepare data_day00 to match the structure of data
 data_day00_formatted <- dat_columns |>
-  filter(sample_date %in% c("S08")) |>
+  filter(sample_date %in% c("S10")) |>
   select(replicate, day_no = Sampling_Day, col_no, all_of(variables) ) |>
   mutate(
     day_no = as.factor(day_no),
@@ -83,7 +83,7 @@ data_combined <- bind_rows(data, data_day00_formatted)
 # create the columnID to match the after reversal ID's
 data_all <- data_combined |>
   mutate(columnID = case_when(
-    day_no == "Day00" ~ as.factor(paste0(replicate, "_", after_reversal_position)), 
+    day_no == "Day0" ~ as.factor(paste0(replicate, "_", after_reversal_position)), 
     TRUE ~ as.factor(columnID))) |>
   select(!after_reversal_position)
 
