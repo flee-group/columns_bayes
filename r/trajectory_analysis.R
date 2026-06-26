@@ -51,6 +51,10 @@ for(i in 1:length(unique_days)) {
 }
 
 par(mfrow = c(1, 1))
+
+
+trajectory_scores <- trajectoryPCoA(x)[["points"]][,1:6]
+
 ## Trajectory metrics
 ### Changes in ecological states
 #### Trajectory Lenght - Changes in the ecological state
@@ -59,7 +63,9 @@ trajectories <- merge(trajectories, unique(pca_data[,c(1,2)]), by = "replicate")
 
 mean_trajectory <- trajectories |>
   group_by(day_no) |>
-  summarise(mean_path = mean(Path))
+  summarise(mean_path = mean(Path), 
+            S1 = mean(S1),
+            S2 = mean(S2))
 
 # Long data for the side by side boxplots
 trajectories_long <- trajectories |>
@@ -79,7 +85,6 @@ length_plot <- ggplot(data = trajectories_long, aes(x = day_no, y = Value, fill 
 ggplot(data = mean_trajectory) +
   geom_point(aes(x = day_no, y = mean_path))+
   theme_bw()
-
 
 ggplot(data = trajectories) +
   geom_boxplot(aes(x = day_no, y =Path))+
@@ -104,7 +109,6 @@ ggplot(data = mean_trajectory_variation) +
   geom_point(aes(x = day_no, y = mean_variation)) +
   theme_bw()
 
-
 ### Changes in direction
 #### angles
 trajectory_angles <- data.frame(replicate = rownames(trajectoryAngles(x)), trajectoryAngles(x))
@@ -112,7 +116,7 @@ trajectory_angles <- merge(trajectory_angles, unique(pca_data[,c(1,2)]), by = "r
 
 mean_angles <- trajectory_angles |>
   group_by(day_no) |>
-  summarise(mean_angle = mean(S1.S2))
+  summarise(mean_angle = mean(circular::circular(S1.S2, units = "degrees", type = "angles")))
 
 angle_plot <- ggplot(data = trajectory_angles) +
   geom_boxplot(aes(x = day_no, y = S1.S2, fill = day_no)) +
@@ -126,11 +130,12 @@ ggplot(data = mean_angles) +
 #### Trajectory Directionality
 trajectory_directionality <- data.frame(replicate = names(trajectoryDirectionality(x)), 
                                         trajectoryDirectionality = trajectoryDirectionality(x))
+
 trajectory_directionality <- merge(trajectory_directionality, unique(pca_data[,c(1,2)]), by = "replicate")
 
 mean_directionality <- trajectory_directionality |>
   group_by(day_no) |>
-  summarise(mean_angle = mean(trajectoryDirectionality))
+  summarise(mean_angle = mean(circular::circular(trajectoryDirectionality, type = "directions")))
 
 directionality_plot <- ggplot(data = trajectory_directionality) +
   geom_boxplot(aes(x = day_no, y = trajectoryDirectionality, fill = day_no)) +
@@ -138,8 +143,6 @@ directionality_plot <- ggplot(data = trajectory_directionality) +
   labs(x = "Day", y = "Trajectory Directionality") +
   scale_fill_manual(values = c("#f1a226", "#9fc8c8", "#54a1a1", "#1f6f6f"))
 
-ggplot(data = mean_directionality) +
-  geom_point(aes(x = day_no, y = mean_angle))
 
 #### Trajectory Shifts 
 trajectoryShifts(x)
@@ -184,144 +187,20 @@ dynamicVariation(subsetTrajectories(x, c("E","J", "L", "N")))
 dynamicVariation(subsetTrajectories(x, c("A","G", "I", "P")))
 dynamicVariation(subsetTrajectories(x, c("B","C", "F")))
 
-#### Centering the trajectories
-# Get centered trajectories
-centered_x <- centerTrajectories(x)
-
-# Get PCoA coordinates from the centered distance matrix
-pcoa_centered <- cmdscale(centered_x$d, k = 2)
-
-# Define colors for each day
-unique_days <- sort(unique(pca_data$day_no))
-day_colors <- c("#f1a226", "#9fc8c8", "#54a1a1", "#1f6f6f")
-names(day_colors) <- as.character(unique_days)
-
-# Get replicate-day mapping
-replicate_days <- unique(pca_data[, c("day_no", "replicate")])
-
-# ============ COMBINED PLOT WITH ALL CENTERED TRAJECTORIES ============
-entities <- pca_data$replicate
-surveys <- as.numeric(substr(pca_data$col_no, 8, 8))
-unique_entities <- unique(entities)
-
-# Create the plot
-plot(pcoa_centered[, 1], pcoa_centered[, 2], 
-     type = "n",
-     xlab = "PCoA 1 (centered)", 
-     ylab = "PCoA 2 (centered)",
-     main = "Centered Trajectories: All Days Combined")
-
-# Draw trajectories colored by day
-for(ent in unique_entities) {
-  # Get indices for this entity
-  idx <- which(entities == ent)
-  
-  # Get day for this entity to determine color
-  day <- as.character(pca_data$day_no[idx[1]])
-  col <- day_colors[day]
-  
-  # Draw arrows connecting the points (Column 1 -> 2 -> 3)
-  for(i in 1:(length(idx)-1)) {
-    arrows(pcoa_centered[idx[i], 1], pcoa_centered[idx[i], 2],
-           pcoa_centered[idx[i+1], 1], pcoa_centered[idx[i+1], 2],
-           col = col,
-           lwd = 2, 
-           length = 0.1)
-  }
-  
-  # Optional: Add points at each position
-  points(pcoa_centered[idx, 1], pcoa_centered[idx, 2], 
-         pch = 19, 
-         col = col, 
-         cex = 0.5)
-}
-
-# Add legend
-legend("topright", 
-       legend = unique_days,
-       col = day_colors,
-       lty = 1, 
-       lwd = 2,
-       title = "Day",
-       bty = "n")
-
-#### Get average days
-# Matrice of Euclidian distanced d between "states
-averaged_pca_matrix <- pca_scores |>
-  group_by(day_no, col_no) |>
-  summarise(across(PC1:PC6, mean, .names = "{.col}"),
-            .groups = "drop")|>
-  as.data.frame()
-
-d_averaged <- vegdist(as.matrix(averaged_pca_matrix[, 3:8]), method = "euclidean")
-
-entities <- averaged_pca_matrix$day_no
-surveys <- as.numeric(substr(averaged_pca_matrix$col_no, 8, 8))
-
-# Define trajectories
-trajectories_averaged <- defineTrajectories(d_averaged, entities, surveys)
-centered_x <- centerTrajectories(x)
-
-# Get the data
-angles <- trajectoryAngles(trajectories_averaged)
-lengths <- trajectoryLengths(trajectories_averaged)
+proc <- procrustes(trajectory_pcoa, pca_pts)
 
 # Combine into one table
 combined_table <- data.frame(
   Day = rownames(lengths),
-  `Segment 1 \n Length` = signif(lengths$S1, 2),
-  `Segment 2 \n Length` = signif(lengths$S2, 2),
-  `Total \n length` = signif(lengths$Path, 2),
-  `Segment \n angle` = signif(angles$`S1-S2`, 2),
+  `Segment 1 \n Length` = signif(mean_trajectory$S1, 2),
+  `Segment 2 \n Length` = signif(mean_trajectory$S2, 2),
+  `Total \n length` = signif(mean_trajectory$mean_path, 2),
+  `Segment \n angle` = signif(mean_angles[,2], 2),
   check.names = FALSE  # Keep spaces in column names
 )
 
 # Display the table
 print(combined_table)
-
-# Get PCoA coordinates from the centered distance matrix
-pcoa_averaged_centered <- cmdscale(centered_x$d, k = 6)
-
-# Create the plot
-plot(pcoa_averaged_centered[, 1], pcoa_averaged_centered[, 2], 
-     type = "n",
-     xlab = "PCoA 1 (centered)", 
-     ylab = "PCoA 2 (centered)",
-     main = "Centered Trajectories: All Replicates Averaged per Day")
-
-# Draw trajectories colored by day
-for(ent in unique_days) {
-  # Get indices for this entity
-  idx <- which(entities == ent)
-  
-  # Get day for this entity to determine color
-  day <- as.character(averaged_pca_matrix$day_no[idx[1]])
-  col <- day_colors[day]
-  
-  # Draw arrows connecting the points (Column 1 -> 2 -> 3)
-  for(i in 1:(length(idx)-1)) {
-    arrows(pcoa_averaged_centered[idx[i], 1], pcoa_averaged_centered[idx[i], 2],
-           pcoa_averaged_centered[idx[i+1], 1], pcoa_averaged_centered[idx[i+1], 2],
-           col = col,
-           lwd = 2, 
-           length = 0.1)
-  }
-  
-  # Optional: Add points at each position
-  points(pcoa_averaged_centered[idx, 1], pcoa_averaged_centered[idx, 2], 
-         pch = 19, 
-         col = col, 
-         cex = 0.5)
-}
-
-# Add legend
-legend("topright", 
-       legend = unique_days,
-       col = day_colors,
-       lty = 1, 
-       lwd = 2,
-       title = "Day",
-       bty = "n")
 
 
 ## grouped plot
@@ -339,3 +218,87 @@ table_plot <- ggtexttable(combined_table, rows = NULL,
 (average_arrows_facet + loadings_plot) / table_plot + 
   plot_layout(heights = c(1.5, 1)) 
                                       
+# Trajectory analysis on the pure data
+d_pure <- vegdist(scale(pca_data[, !c("replicate", "day_no", "col_no", "columnID", "day_number")], center = TRUE, scale = TRUE), method = "euclidian")
+entities <- as.character(pca_data$replicate)
+surveys <- as.numeric(substr(pca_data$col_no, 8, 8))
+
+# Define trajectories
+x_pure <- defineTrajectories(d_pure, entities, surveys)
+plot_from_raw <- trajectoryPCoA(x_pure)
+
+#angles
+trajectory_angles_from_raw <- data.frame(replicate = rownames(trajectoryAngles(x_pure)), trajectoryAngles(x_pure))
+trajectory_angles_from_raw <- merge(trajectory_angles_from_raw, unique(pca_data[,c(1,2)]), by = "replicate")
+
+mean_angles_raw <- trajectory_angles_from_raw |>
+  group_by(day_no) |>
+  summarise(mean_angle = mean(circular::circular(S1.S2, units = "degrees", type = "angles")))
+
+#trajectory length
+trajectory_length_from_raw <- data.frame(replicate = rownames(trajectoryLengths(x_pure, relativeToInitial = FALSE)), trajectoryLengths(x_pure, relativeToInitial = FALSE))
+trajectory_length_from_raw <-merge(trajectory_length_from_raw, unique(pca_data[,c(1,2)]), by = "replicate")
+
+mean_trajectory_raw <- trajectory_length_from_raw |>
+  group_by(day_no) |>
+  summarise(mean_path = mean(Path), 
+            S1 = mean(S1),
+            S2 = mean(S2))
+
+# plotting by colour
+scores_raw <- cbind(trajectoryPCoA(x_pure)[["points"]][,1:6], pca_data[,1:3])
+
+# Then build arrows from averaged positions
+arrow_data_all <- scores_raw[, .(
+  x_start = c(V1[col_no == "Column 1"], V1[col_no == "Column 2"]),
+  y_start = c(V2[col_no == "Column 1"], V2[col_no == "Column 2"]),
+  x_end   = c(V1[col_no == "Column 2"], V1[col_no == "Column 3"]),
+  y_end   = c(V2[col_no == "Column 2"], V2[col_no == "Column 3"]),
+  segment = c("1to2", "2to3")
+), by = .(day_no, replicate)]
+
+explained_variance_pcoa <- abs(plot_from_raw$eig)/sum(abs(plot_from_raw$eig))
+
+arrows_per_replicate <- ggplot(data = arrow_data_all, aes(colour = day_no)) +
+  geom_segment(aes(x = x_start, y = y_start, 
+                   xend = x_end, yend = y_end),
+               arrow = arrow(length = unit(0.1, "cm"), type = "closed"),
+               linewidth = 1) +
+  labs(x = paste0("PCoA1 (", round(explained_variance_pcoa[1], 3)*100, "%)"),
+       y = paste0("PC2 (", round(explained_variance_pcoa[2], 3)*100, "%)"),
+       color = "Day",  title = "PCA Scores") +
+  theme_bw() +
+  theme(panel.grid.minor = element_blank(),
+        plot.title = element_text(hjust = 0.5, face = "bold"),
+        legend.position = "bottom",
+        legend.location = "panel") +
+  scale_colour_manual(values = (c("#f1a226", "#c0d8d8","#7dc5c5","#1f6f6f"))) 
+
+# Combine into one table
+combined_table_raw <-  merge(
+  mean_trajectory_raw[, c("day_no", "S1", "S2", "mean_path")],
+  mean_angles_raw,
+  by = "day_no"
+) |>
+  rename(`Day` = day_no,
+         `Segment \n angle` = mean_angle, 
+         `Segment 1 \n Length` = S1,
+         `Segment 2 \n Length` = S2,
+         `Total \n length` = mean_path) |>
+  arrange(Day) |>
+  mutate(across(where(is.numeric), ~ signif(.x, 2))) 
+
+combined_table_raw$Day <- factor(combined_table_raw$Day,
+       levels = c("Day0", "Day1", "Day2","Day3", "Day7", "Day9", "Day10", "Day12", "Day14", "Day17"), 
+       labels = c("0", "1", "2", "3", "7", "9", "10", "12", "14", "17"))
+
+# Create the table as a ggplot object
+table_plot_raw <- ggpubr::ggtexttable(combined_table_raw, rows = NULL, theme = ggpubr::ttheme("light"))
+
+# Combine with patchwork
+combined_plot <- (arrows_per_replicate) / table_plot_raw + 
+  patchwork::plot_layout(heights = c(1.5, 1)) 
+
+pdf('output/plots/PcoA_and_table.pdf', width = 4.3, height = 5.9)
+plot(combined_plot)
+dev.off()
