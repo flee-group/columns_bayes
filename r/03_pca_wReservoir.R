@@ -22,10 +22,10 @@ pca_data_wReservoir$day_no <- factor(pca_data_wReservoir$day_no,
 pca_data_wReservoir <- pca_data_wReservoir |>
   filter(day_no != "Day9") |>
   mutate(suva254 = a254/(DOC/1000)) |>
-  select(-c("a254", "DOC", "DN")) |>
+  select(-c("a254", "DOC", "DN"))
   #filter(day_no %in% c("Day0", "Day3", "Day10", "Day17"))|> # remove all the other days for reduced data
   # keep only these Day3 replicates, BUT always keep the reservoir (C0) row
-  filter(day_no != "Day3" | replicate %in% c("L", "N", "E", "J") | col_no == "C0")
+  #filter(day_no != "Day3" | replicate %in% c("L", "N", "E", "J") | col_no == "C0")
 
 # columns that are NOT variables fed to the PCA
 meta_cols_wReservoir <- c("replicate", "day_no", "col_no", "day_number")
@@ -56,6 +56,44 @@ scores_active[, `:=`(replicate = meta_wReservoir$replicate,
                      col_no    = meta_wReservoir$col_no)]
 loadings_active <- pca_active$rotation
 explained_variance <- pca_active$sdev^2 / sum(pca_active$sdev^2)
+
+# Scree plot: variance explained by each PC (bars) and cumulative variance (line)
+scree_data <- data.frame(PC = factor(colnames(pca_active$x), levels = colnames(pca_active$x)),
+                         explained = explained_variance * 100,
+                         cumulative = cumsum(explained_variance) * 100)
+
+scree_plot <- ggplot(scree_data, aes(x = PC)) +
+  geom_col(aes(y = explained), fill = "#4E7B4A") +
+  geom_text(aes(y = explained, label = paste0(round(explained, 1), "%")),
+            vjust = 1.5, size = 3.5, colour = "white") +
+  geom_line(aes(y = cumulative, group = 1), colour = "gray30") +
+  geom_point(aes(y = cumulative), colour = "gray30") +
+  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 25)) +
+  labs(x = NULL, y = "Variance explained (%)",
+       title = "PCA Scree Plot", subtitle = "Bars: per component; line: cumulative") +
+  theme_bw() +
+  theme(panel.grid.minor = element_blank(),
+        plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+ggsave("output/plots/PCA_wReservoir_scree.pdf", plot = scree_plot, width = 6, height = 4.5)
+
+# Eigenvalue plot: variance of each PC on the standardised variables. The dashed line is
+# the Kaiser criterion (eigenvalue = 1, i.e. a PC carrying more than one variable's worth)
+scree_data$eigenvalue <- pca_active$sdev^2
+
+eigenvalue_plot <- ggplot(scree_data, aes(x = PC, y = eigenvalue)) +
+  geom_col(fill = "#4E7B4A") +
+  geom_text(aes(label = round(eigenvalue, 2)), vjust = 1.5, size = 3.5, colour = "white") +
+  geom_hline(yintercept = 1, linetype = "dashed", colour = "gray30") +
+  labs(x = NULL, y = "Eigenvalue", title = "PCA Eigenvalues",
+       subtitle = "Dashed line: Kaiser criterion (eigenvalue = 1)") +
+  theme_bw() +
+  theme(panel.grid.minor = element_blank(),
+        plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+ggsave("output/plots/PCA_wReservoir_eigenvalues.pdf", plot = eigenvalue_plot, width = 6, height = 4.5)
 
 
 # ============================================================================
@@ -144,7 +182,7 @@ loadings_plot <- ggplot() +
             size = 3.5, fontface = "bold", show.legend = FALSE, parse = TRUE) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
   geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
-  scale_colour_manual(name = "Index group", values = carbon_source_colors) +
+  scale_colour_manual(name = NULL, values = carbon_source_colors) +
   coord_cartesian(clip = "off") +
   labs(x = paste0("PC1 (", round(explained_variance[1], 3)*100, "%)"),
        y = paste0("PC2 (", round(explained_variance[2], 3)*100, "%)"),
@@ -167,7 +205,7 @@ average_arrows_facet <- ggplot(data = average_arrow_data, aes(colour = day_no)) 
                linewidth = 1) +
   labs(x = paste0("PC1 (", round(explained_variance[1], 3)*100, "%)"),
        y = paste0("PC2 (", round(explained_variance[2], 3)*100, "%)"),
-       color = "Day",  title = "PCA Scores") +
+       color = NULL,  title = "PCA Scores") +
   theme_bw() +
   theme(panel.grid.minor = element_blank(),
         plot.title = element_text(hjust = 0.5, face = "bold"),
