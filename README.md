@@ -1,5 +1,8 @@
-# A Bayesian Model for the Column Experiment
-A Bayesian model trial for column experiment data analyzing dissolved organic matter dynamics before and after flow reversal.
+# Column Experiment: Dissolved Organic Matter Dynamics
+
+Analysis of dissolved organic matter dynamics before and after flow reversal in a
+column experiment, using PCA and trajectory analysis of optical indices with the
+feed reservoir included as the source state.
 
 ## Data Description
 This dataset contains dissolved organic carbon (DOC), dissolved nitrogen (DN), and optical measurements from column experiment samples with different substrate inputs, collected across multiple sampling days with treatment replicates.
@@ -15,37 +18,48 @@ Contains optical measurements from 1 day before flow reversal onwards (starting 
 - **Optical indices**: BIX (biological index), FI (fluorescence index), HIX (humification index)
 - **Absorbance metrics**: a254 (decadal absorbance at 254 nm), E2_E3 ratio, SR (slope ratio)
 - **Metadata**: sample_day, replicate, col_no, and assigned day labels
+- **Reservoir rows** are marked `replicate == "Reservoir"` and are split out as the `C0` state
 
 ### 2. DOC and DN Measurements (`DOC_final_pretreated_all.csv`)
 Contains dissolved organic carbon and nitrogen data:
 - **Sample format**: `<sampling_day>_<replicate>_<column_number>`
-- **Measurements**: DOC (mg C/L), DN (mg N/L)
-- **Temporal framework**: 
+- **Measurements**: DOC and DN in µg/L (note: SUVA254 divides by `DOC/1000` to convert to mg/L)
+- **Reservoir rows** are encoded as column `C0`, duplicated once per replicate
+- **Temporal framework**:
   - Pre-reversal: "Day_minusX" (X days before flow reversal)
-  - Day 00: Complete replicate collection
-  - Day 0: Four replicates collected minutes before flow reversal
+  - Day 00 (S08): Complete replicate collection
+  - Day 0 (S10): Four replicates collected minutes before flow reversal
   - Post-reversal: Days numbered sequentially after flow reversal
 
 ## Analysis Structure
-- `01_data_cleaning.R`: Data preprocessing and log-ratio calculations
-- `02_plot.R`: Visualization of temporal patterns
-- `columns_rstan.r`: Bayesian model implementation using RStan
 
-## Script Overview
+Scripts are numbered in run order and live in `/r`:
 
-### `01_data_cleaning.R`
-Data preprocessing pipeline that:
-- Loads and merges optical indices and DOC/DN datasets
-- Filters data to post-flow reversal period (S08 onwards)
-- Calculates baseline averages from pre-reversal samples
-- Transforms variables to log ratios relative to baseline values
-- Creates analysis-ready dataset with normalized measurements for Bayesian modeling
+| Script | Purpose | Writes |
+|---|---|---|
+| `01_data_cleaning_wReservoir.R` | Merge optical + DOC data, build the column track, add one reservoir (`C0`) observation per day | `data/cleaned_data_wReservoir.rds` |
+| `02_plot.R` | Multi-panel boxplots of each variable over time, by column position | `output/plots/DOC_and_optical.pdf` |
+| `03_pca_wReservoir.R` | PCA on the optical indices with the reservoir as a single source point; arrow and loadings plots | `output/plots/PCA_wReservoir_active_arrows.pdf` |
+| `04_trajectory_analysis_wReservoir.R` | 4-state trajectory analysis (C0 → C1 → C2 → C3): lengths, angles, directionality | `output/plots/trajectory_wReservoir_*.pdf` |
+| `05_SI_table.R` | Supplementary table of all optical/DOC values per sampling day and column | `output/optical_data_table.csv` |
 
-### `02_plot.R`
-Visualization script that:
-- Creates multi-panel boxplots showing temporal patterns across all variables
-- Displays log-ratio changes over time for each column treatment
-- Generates publication-ready figures saved as PDF output
+`r/plotting_functions.R` holds shared ggplot helpers and `convert_column_labels()`.
 
-### `columns_rstan.r`
-Bayesian modeling implementation using RStan for time series analysis of column experiment data.
+### Run order matters
+
+`01` and `05` are self-contained (`05` sources `01`). But **`02` and `04` depend on
+objects left in the global environment by earlier scripts** — `04` in particular needs
+`scores_active` and `figs_active` from `03`. Run them in numeric order in a single
+session.
+
+## Analysis Notes
+
+- **Before reversal.** The analysis pipeline treats **S10 (Day0) alone** as the
+  before-reversal state; S08 is dropped. The SI table (`05`) instead reports the
+  **average of S08 and S10**, re-reading S08 directly from the raw files, with each
+  day averaged over its replicates and the two day-means then averaged 50/50.
+- **Replicate `O`** is excluded throughout — it was never reversed.
+- **SUVA254** is computed as `a254 / (DOC/1000)`, since DOC is stored in µg/L.
+- **The reservoir** is reduced to one observation per sampling day, so it does not
+  outweigh the columns in the PCA. Duplicate reservoir rows within a sampling event
+  (e.g. S15) are averaged.

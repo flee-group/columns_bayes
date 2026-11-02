@@ -5,3 +5,6 @@ data/*
 .Rproj.user
 output/*
 .positai
+.RData
+.Rhistory
+.DS_Store

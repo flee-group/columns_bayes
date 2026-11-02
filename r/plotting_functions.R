@@ -24,6 +24,27 @@ color_column <- function() {
                               guide = "legend")
 }
 
+#' Day Colour Palette
+#'
+#' Builds a named colour vector for the sampling days: the first day (Day0) is the
+#' yellow "#f1a226", and the remaining days follow a light-to-dark teal gradient.
+#' Colours are spaced evenly by day order, not by day number.
+#'
+#' @param day_levels Character vector of day levels in plotting order, Day0 first.
+#' @return A named character vector of colours, one per element of `day_levels`.
+#' @export
+#'
+#' @examples
+#' ggplot(df, aes(x, y, colour = day_no)) +
+#'   geom_point() +
+#'   scale_colour_manual(values = day_colors(levels(df$day_no)))
+day_colors <- function(day_levels) {
+  stats::setNames(
+    c("#f1a226",
+      grDevices::colorRampPalette(c("#cfe8e8", "#0e4848"))(length(day_levels) - 1)),
+    day_levels)
+}
+
 #' Convert Column Identifiers to Descriptive Labels
 #'
 #' This function converts short column identifiers (e.g., "C1", "C2") into their full descriptive names
@@ -44,9 +65,11 @@ color_column <- function() {
 #' @export
 #'
 convert_column_labels = function(data) {
+  # "C0" (the reservoir state) is listed first so the factor orders C0 < C1 < C2 < C3.
+  # For column-only data (no reservoir) "C0" is simply an unused level and has no effect.
   data$col_no = factor(data$col_no,
-                         levels = c("C1", "C2", "C3"),
-                         labels = c("Column 1", "Column 2", "Column 3"))
+                         levels = c("C0", "C1", "C2", "C3"),
+                         labels = c("C0", "Column 1", "Column 2", "Column 3"))
   return(data)
 }
 
